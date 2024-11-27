@@ -1,9 +1,5 @@
 # CISC/CMPE 204 Modelling Project: Battleship Cheats
 
-Welcome to the major project for CISC/CMPE 204!
-
-Change this README.md file to summarize your project, and provide pointers to the general structure of the repository. How you organize and build things (which files, how you structure things, etc) is entirely up to you! The only things you must keep in place are what is already listed in the **Structure** section below.
-
 In our project, we aim to model the two-player strategy board game, Battleship, and solve a way to cheat, if we were allowed to move some of the ships. A fleet of ships is placed onto a grid. To steer our project in a unique direction, we will explore how players can shift their ships in response to incoming shots to avoid being hit. It is considered a miss if the opponent incorrectly targets a position without a ship, or if the player successfully shifts their ship out of harm’s way. A shot is a hit if the opponent correctly identifies the location of a ship, and the player has no option to move their ship to avoid the hit. Our model will use logical propositions and constraints to represent the game board, ship placements and shifts, and shots fired systematically.
 
 ## Structure
