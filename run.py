@@ -19,6 +19,63 @@ class BasicPropositions:
     def _prop_name(self):
         return f"A.{self.data}"
 
+@proposition(E)
+class ShipProposition:
+    
+    def __init__(self, ship, x, y, t):
+        self.ship = ship
+        self.x = x
+        self.y = y
+        self.t = t
+    
+    def _prop_name(self):
+        return f"Ship_{self.ship}_({self.x}, {self.y}_Turn{self.t})"
+    
+@proposition(E)
+class ShotProposition:
+    
+    def __init__(self, x, y, t):
+        self.x = x
+        self.y = y
+        self.t = t
+    
+    def _prop_name(self):
+        return f"Shot_({self.x}, {self.y}_Turn{self.t}"
+    
+@proposition(E)
+class SunkProposition:
+
+    def __init__(self, ship, t):
+        self.ship = ship
+        self.t = t
+
+    def _prop_name(self):
+        return f"Sunk_{self.ship}_Turn{self.t}"
+    
+@proposition(E)
+class BumpProposition:
+    
+    def __init__(self, x, y, t):
+        self.x = x
+        self.y = y
+        self.t = t
+
+    def _prop_name(self):
+        return f"Bump_({self.x},{self.y})_Turn{self.t}"
+
+@proposition(E)
+class TurnProposition:
+    def __init__(self, t):
+        self.t = t
+
+    def _prop_name(self):
+        return f"Turn_{self.t}"
+
+@proposition(E)
+class GameOverProposition:
+    def _prop_name(self):
+        return "Game_Over"
+
 
 # Different classes for propositions are useful because this allows for more dynamic constraint creation
 # for propositions within that class. For example, you can enforce that "at least one" of the propositions
