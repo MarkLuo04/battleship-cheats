@@ -19,8 +19,9 @@ class BasicPropositions:
     def _prop_name(self):
         return f"A.{self.data}"
 
+# Ship Propositions
 @proposition(E)
-class ShipProposition:
+class ShipYProposition:
     
     def __init__(self, ship, x, y, t):
         self.ship = ship
@@ -29,52 +30,105 @@ class ShipProposition:
         self.t = t
     
     def _prop_name(self):
-        return f"Ship_{self.ship}_({self.x}, {self.y}_Turn{self.t})"
-    
+        return f"ShipY_{self.ship}_({self.x},{self.y})_Turn{self.t}"
+
 @proposition(E)
-class ShotProposition:
+class BumpedYProposition:
     
-    def __init__(self, x, y, t):
+    def __init__(self, ship, x, y, t):
+        self.ship = ship
         self.x = x
         self.y = y
         self.t = t
     
     def _prop_name(self):
-        return f"Shot_({self.x}, {self.y}_Turn{self.t}"
-    
-@proposition(E)
-class SunkProposition:
+        return f"BumpedY_{self.ship}_({self.x},{self.y})_Turn{self.t}"
 
+@proposition(E)
+class ShipYMovableProposition:
+    
     def __init__(self, ship, t):
         self.ship = ship
         self.t = t
-
-    def _prop_name(self):
-        return f"Sunk_{self.ship}_Turn{self.t}"
     
+    def _prop_name(self):
+        return f"ShipY_Movable_{self.ship}_Turn{self.t}"
+
 @proposition(E)
-class BumpProposition:
+class AdjProposition:
+    
+    def __init__(self, x1, y1, x2, y2):
+        self.x1 = x1
+        self.y1 = y1
+        self.x2 = x2
+        self.y2 = y2
+    
+    def _prop_name(self):
+        return f"Adj_{self.x1},{self.y1}_{self.x2},{self.y2}"
+
+# Shot Propositions
+@proposition(E)
+class ShotYProposition:
     
     def __init__(self, x, y, t):
         self.x = x
         self.y = y
         self.t = t
-
+    
     def _prop_name(self):
-        return f"Bump_({self.x},{self.y})_Turn{self.t}"
+        return f"ShotY_({self.x},{self.y})_Turn{self.t}"
 
 @proposition(E)
-class TurnProposition:
+class HitYProposition:
+    
+    def __init__(self, x, y, t):
+        self.x = x
+        self.y = y
+        self.t = t
+    
+    def _prop_name(self):
+        return f"HitY_({self.x},{self.y})_Turn{self.t}"
+
+@proposition(E)
+class MissYProposition:
+    
+    def __init__(self, x, y, t):
+        self.x = x
+        self.y = y
+        self.t = t
+    
+    def _prop_name(self):
+        return f"MissY_({self.x},{self.y})_Turn{self.t}"
+
+# Sunk Ship Proposition
+@proposition(E)
+class SunkYProposition:
+    
+    def __init__(self, ship, t):
+        self.ship = ship
+        self.t = t
+    
+    def _prop_name(self):
+        return f"SunkY_{self.ship}_Turn{self.t}"
+
+# Turn Indicators
+@proposition(E)
+class Turn1Proposition:
+    
     def __init__(self, t):
         self.t = t
-
+    
     def _prop_name(self):
-        return f"Turn_{self.t}"
+        return f"Turn1_{self.t}"
 
 @proposition(E)
-class GameOverProposition:
+class Turn2Proposition:
+    
+    def __init__(self, t):
+        self.t = t
+    
     def _prop_name(self):
-        return "Game_Over"
+        return f"Turn2_{self.t}"
 
 
 # Different classes for propositions are useful because this allows for more dynamic constraint creation
