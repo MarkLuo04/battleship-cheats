@@ -9,171 +9,156 @@ config.sat_backend = "kissat"
 # Encoding that will store all of your constraints
 E = Encoding()
 
-# To create propositions, create classes for them first, annotated with "@proposition" and the Encoding
+# Propositions are defined as per the provided structure
 @proposition(E)
 class BasicPropositions:
-
     def __init__(self, data):
         self.data = data
 
     def _prop_name(self):
         return f"A.{self.data}"
 
-# Ship Propositions
 @proposition(E)
-class ShipYProposition:
-    
-    def __init__(self, ship, x, y, t):
+class ShipPropositions:
+    def __init__(self, player, ship, x, y, t):
+        self.player = player
         self.ship = ship
         self.x = x
         self.y = y
         self.t = t
-    
+
     def _prop_name(self):
-        return f"ShipY_{self.ship}_({self.x},{self.y})_Turn{self.t}"
+        return f"ship{self.player}_{self.ship}_({self.x},{self.y})_Turn{self.t}"
 
 @proposition(E)
-class BumpedYProposition:
-    
-    def __init__(self, ship, x, y, t):
+class BumpedProposition:
+    def __init__(self, player, ship, x, y, t):
+        self.player = player
         self.ship = ship
         self.x = x
         self.y = y
         self.t = t
-    
+
     def _prop_name(self):
-        return f"BumpedY_{self.ship}_({self.x},{self.y})_Turn{self.t}"
+        return f"Bumped{self.player}_{self.ship}_({self.x},{self.y})_Turn{self.t}"
 
 @proposition(E)
-class ShipYMovableProposition:
-    
-    def __init__(self, ship, t):
+class ShipMovableProposition:
+    def __init__(self, player, ship, t):
+        self.player = player
         self.ship = ship
         self.t = t
-    
+
     def _prop_name(self):
-        return f"ShipY_Movable_{self.ship}_Turn{self.t}"
+        return f"Ship{self.player}_Movable_{self.ship}_Turn{self.t}"
 
 @proposition(E)
 class AdjProposition:
-    
     def __init__(self, x1, y1, x2, y2):
         self.x1 = x1
         self.y1 = y1
         self.x2 = x2
         self.y2 = y2
-    
+
     def _prop_name(self):
         return f"Adj_{self.x1},{self.y1}_{self.x2},{self.y2}"
 
-# Shot Propositions
 @proposition(E)
-class ShotYProposition:
-    
-    def __init__(self, x, y, t):
+class ShotProposition:
+    def __init__(self, player, x, y, t):
+        self.player = player
         self.x = x
         self.y = y
         self.t = t
-    
+
     def _prop_name(self):
-        return f"ShotY_({self.x},{self.y})_Turn{self.t}"
+        return f"Shot{self.player}_({self.x},{self.y})_Turn{self.t}"
 
 @proposition(E)
-class HitYProposition:
-    
-    def __init__(self, x, y, t):
+class HitProposition:
+    def __init__(self, player, x, y, t):
+        self.player = player
         self.x = x
         self.y = y
         self.t = t
-    
+
     def _prop_name(self):
-        return f"HitY_({self.x},{self.y})_Turn{self.t}"
+        return f"Hit{self.player}_({self.x},{self.y})_Turn{self.t}"
 
 @proposition(E)
-class MissYProposition:
-    
-    def __init__(self, x, y, t):
+class MissProposition:
+    def __init__(self, player, x, y, t):
+        self.player = player
         self.x = x
         self.y = y
         self.t = t
-    
-    def _prop_name(self):
-        return f"MissY_({self.x},{self.y})_Turn{self.t}"
 
-# Sunk Ship Proposition
+    def _prop_name(self):
+        return f"Miss{self.player}_({self.x},{self.y})_Turn{self.t}"
+
 @proposition(E)
-class SunkYProposition:
-    
-    def __init__(self, ship, t):
+class SunkProposition:
+    def __init__(self, player, ship, t):
+        self.player = player
         self.ship = ship
         self.t = t
-    
-    def _prop_name(self):
-        return f"SunkY_{self.ship}_Turn{self.t}"
 
-# Turn Indicators
+    def _prop_name(self):
+        return f"Sunk{self.player}_{self.ship}_Turn{self.t}"
+
 @proposition(E)
-class Turn1Proposition:
-    
-    def __init__(self, t):
+class TurnPropositions:
+    def __init__(self, player, t):
+        self.player = player
         self.t = t
-    
-    def _prop_name(self):
-        return f"Turn1_{self.t}"
-
-@proposition(E)
-class Turn2Proposition:
-    
-    def __init__(self, t):
-        self.t = t
-    
-    def _prop_name(self):
-        return f"Turn2_{self.t}"
-
-
-# Different classes for propositions are useful because this allows for more dynamic constraint creation
-# for propositions within that class. For example, you can enforce that "at least one" of the propositions
-# that are instances of this class must be true by using a @constraint decorator.
-# other options include: at most one, exactly one, at most k, and implies all.
-# For a complete module reference, see https://bauhaus.readthedocs.io/en/latest/bauhaus.html
-@constraint.at_least_one(E)
-@proposition(E)
-class FancyPropositions:
-
-    def __init__(self, data):
-        self.data = data
 
     def _prop_name(self):
-        return f"A.{self.data}"
-
-# Call your variables whatever you want
-a = BasicPropositions("a")
-b = BasicPropositions("b")   
-c = BasicPropositions("c")
-d = BasicPropositions("d")
-e = BasicPropositions("e")
-# At least one of these will be true
-x = FancyPropositions("x")
-y = FancyPropositions("y")
-z = FancyPropositions("z")
+        return f"Turn{self.player}_t{self.t}"
 
 
-# Build an example full theory for your setting and return it.
-#
-#  There should be at least 10 variables, and a sufficiently large formula to describe it (>50 operators).
-#  This restriction is fairly minimal, and if there is any concern, reach out to the teaching staff to clarify
-#  what the expectations are.
+# # Define the constraints
+grid_size = 5
+players = [1, 2]
+ships = ['A', 'B']
+turns = range(3)
+
+# Ship placement constraints
+for p in players:
+    for ship in ships:
+        for t in turns:
+            for x in range(grid_size):
+                for y in range(grid_size):
+                    E.add_constraint(
+                        ShipPropositions(p, ship, x, y, t) >> ~BumpedProposition(p, ship, x, y, t)
+                    )
+
+# Adjacency constraints
+for x in range(grid_size):
+    for y in range(grid_size):
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < grid_size and 0 <= ny < grid_size:
+                E.add_constraint(AdjProposition(x, y, nx, ny))
+
+# Shot constraints
+for p in players:
+    opponent = 3 - p
+    for t in turns:
+        for x in range(grid_size):
+            for y in range(grid_size):
+                shot = ShotProposition(p, x, y, t)
+                hit = HitProposition(opponent, x, y, t)
+                miss = MissProposition(opponent, x, y, t)
+                E.add_constraint(shot >> (hit | miss))
+                E.add_constraint(hit >> ShipPropositions(opponent, 'A', x, y, t))
+
+# Turn constraints
+for t in turns[:-1]:
+    for p in players:
+        opponent = 3 - p
+        E.add_constraint(TurnPropositions(p, t) >> TurnPropositions(opponent, t + 1))
+
 def example_theory():
-    # Add custom constraints by creating formulas with the variables you created. 
-    E.add_constraint((a | b) & ~x)
-    # Implication
-    E.add_constraint(y >> z)
-    # Negate a formula
-    E.add_constraint(~(x & y))
-    # You can also add more customized "fancy" constraints. Use case: you don't want to enforce "exactly one"
-    # for every instance of BasicPropositions, but you want to enforce it for a, b, and c.:
-    constraint.add_exactly_one(E, a, b, c)
-
     return E
 
 
