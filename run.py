@@ -116,47 +116,59 @@ class TurnPropositions:
         return f"Turn{self.player}_t{self.t}"
 
 def example_theory():
-    # Define the constraints
+  # Ship placement constraints (kept from earlier for completeness)
     grid_size = 5
     players = [1, 2]
-    ships = ['A', 'B']
-    turns = range(3)
-    
-    # Ship placement constraints
+    ships = ['A', 'B', 'C']  # Example ship types
+    turns = range(3)  # Example: 3 turns
+
+    # No two ships of the same player can occupy the same cell
     for p in players:
-        for ship in ships:
-            for t in turns:
-                for x in range(grid_size):
-                    for y in range(grid_size):
-                        E.add_constraint(
-                            ShipPropositions(p, ship, x, y, t) >> ~BumpedProposition(p, ship, x, y, t)
-                        )
-    
-    # Adjacency constraints
-    for x in range(grid_size):
-        for y in range(grid_size):
-            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < grid_size and 0 <= ny < grid_size:
-                    E.add_constraint(AdjProposition(x, y, nx, ny))
-    
-    # Shot constraints
-    for p in players:
-        opponent = 3 - p
         for t in turns:
-            for x in range(grid_size):
-                for y in range(grid_size):
-                    shot = ShotProposition(p, x, y, t)
-                    hit = HitProposition(opponent, x, y, t)
-                    miss = MissProposition(opponent, x, y, t)
-                    E.add_constraint(shot >> (hit | miss))
-                    E.add_constraint(hit >> ShipPropositions(opponent, 'A', x, y, t))
-    
-    # Turn constraints
+            for x1 in range(grid_size):
+                for y1 in range(grid_size):
+                    for ship1 in ships:
+                        for ship2 in ships:
+                            if ship1 != ship2:
+                                E.add_constraint(
+                                    ShipPropositions(p, ship1, x1, y1, t) >> ~ShipPropositions(p, ship2, x1, y1, t)
+                                )
+
+    # Enforce that turns are either Player 1's or Player 2's
+    for t in turns:
+        E.add_constraint(
+            TurnPropositions(1, t) >> ~TurnPropositions(2, t)
+        )
+        E.add_constraint(
+            TurnPropositions(2, t) >> ~TurnPropositions(1, t)
+        )
+        E.add_constraint(
+            TurnPropositions(1, t) | TurnPropositions(2, t)
+        )
+
+    # Alternating turns between players
     for t in turns[:-1]:
-        for p in players:
-            opponent = 3 - p
-            E.add_constraint(TurnPropositions(p, t) >> TurnPropositions(opponent, t + 1))
+        E.add_constraint(
+            TurnPropositions(1, t) >> TurnPropositions(2, t + 1)
+        )
+        E.add_constraint(
+            TurnPropositions(2, t) >> TurnPropositions(1, t + 1)
+        )
+    # Shot constraints
+    for i, j in grid_positions:
+        for t in range(max_turns):
+            E.add_constraint(shotY_ij(t) >> (hitY_ij(t) ^ missY_ij(t)))
+            E.add_constraint(hitY_ij(t) >> (shotY_ij(t) & shipY_xij(t)))
+            E.add_constraint(missY_ij(t) >> (shotY_ij(t) & ~shipY_xij(t)))
+
+    # Bumping mechanism
+    for t in range(1, max_turns):
+        for i, j, k, l in adj_pairs:  # Iterate over adjacent positions
+            E.add_constraint(bumpedY_xij(t) & shipY_xij(t-1) >> (shipY_xij(t) & adj(i, j, k, l)))
+
+    # Game end condition
+    for t in range(max_turns):
+        E.add_constraint(GameEndProposition(t) >> (~TurnPropositions(1, t) & ~TurnPropositions(2, t)))
     return E
 
 if __name__ == "__main__":
