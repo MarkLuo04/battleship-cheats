@@ -28,7 +28,7 @@ class ShipPropositions:
         self.t = t
 
     def _prop_name(self):
-        return f"ship{self.player}_{self.ship}_({self.x},{self.y})_Turn{self.t}"
+        return f"ship{self.player}_{self.ship}{self.x}{self.y}({self.t})"
 
 @proposition(E)
 class BumpedProposition:
@@ -40,7 +40,7 @@ class BumpedProposition:
         self.t = t
 
     def _prop_name(self):
-        return f"Bumped{self.player}_{self.ship}_({self.x},{self.y})_Turn{self.t}"
+        return f"bumped{self.player}_{self.ship}{self.x},{self.y}({self.t})"
 
 @proposition(E)
 class ShipMovableProposition:
@@ -50,7 +50,7 @@ class ShipMovableProposition:
         self.t = t
 
     def _prop_name(self):
-        return f"Ship{self.player}_Movable_{self.ship}_Turn{self.t}"
+        return f"ship{self.player}_movable_{self.ship}({self.t})"
 
 @proposition(E)
 class AdjProposition:
@@ -61,7 +61,7 @@ class AdjProposition:
         self.y2 = y2
 
     def _prop_name(self):
-        return f"Adj_{self.x1},{self.y1}_{self.x2},{self.y2}"
+        return f"adj_({self.x1}{self.y1}_{self.x2}{self.y2})"
 
 @proposition(E)
 class ShotProposition:
@@ -72,7 +72,7 @@ class ShotProposition:
         self.t = t
 
     def _prop_name(self):
-        return f"Shot{self.player}_({self.x},{self.y})_Turn{self.t}"
+        return f"shot{self.player}_{self.x},{self.y}({self.t})"
 
 @proposition(E)
 class HitProposition:
@@ -83,7 +83,7 @@ class HitProposition:
         self.t = t
 
     def _prop_name(self):
-        return f"Hit{self.player}_({self.x},{self.y})_Turn{self.t}"
+        return f"hit{self.player}_{self.x},{self.y}({self.t})"
 
 @proposition(E)
 class MissProposition:
@@ -94,7 +94,7 @@ class MissProposition:
         self.t = t
 
     def _prop_name(self):
-        return f"Miss{self.player}_({self.x},{self.y})_Turn{self.t}"
+        return f"miss{self.player}_{self.x},{self.y}({self.t})"
 
 @proposition(E)
 class SunkProposition:
@@ -104,7 +104,7 @@ class SunkProposition:
         self.t = t
 
     def _prop_name(self):
-        return f"Sunk{self.player}_{self.ship}_Turn{self.t}"
+        return f"sunk{self.player}_{self.ship}({self.t})"
 
 @proposition(E)
 class TurnPropositions:
@@ -113,16 +113,15 @@ class TurnPropositions:
         self.t = t
 
     def _prop_name(self):
-        return f"Turn{self.player}_t{self.t}"
+        return f"Turn{self.player}({self.t})"
 
 def example_theory():
-  # Ship placement constraints (kept from earlier for completeness)
-    grid_size = 5
-    players = [1, 2]
+    grid_size = 5 # Example grid size
+    players = [1, 2] # Two players
     ships = ['A', 'B', 'C']  # Example ship types
-    turns = range(3)  # Example: 3 turns
+    turns = range(5)  # Example: Max 5 turns
 
-    # No two ships of the same player can occupy the same cell
+    # No two ships of the same player can occupy the same cell at the same time 
     for p in players:
         for t in turns:
             for x1 in range(grid_size):
@@ -133,6 +132,74 @@ def example_theory():
                                 E.add_constraint(
                                     ShipPropositions(p, ship1, x1, y1, t) >> ~ShipPropositions(p, ship2, x1, y1, t)
                                 )
+    # A ship can occupy multiple cells
+    for p in players:
+        for t in turns:
+            for ship, size in ships.items():
+                for x1 in range(grid_size):
+                    for y1 in range(grid_size):
+                        if y1 + size - 1 < grid_size:  # Ensure placement fits grid
+                            ship_positions = [
+                                ShipPropositions(p, ship, x1, y1 + offset, t)
+                                for offset in range(size)
+                            ]
+                            E.add_constraint(
+                                E.And(*ship_positions)  # All cells occupied by this ship
+                            )
+
+    # Sunk ships are removed
+    for p in players:
+        for t in turns:
+            for x in range(grid_size):
+                for y in range(grid_size):
+                    for ship in ships:
+                        E.add_constraint(
+                            SunkProposition(p, ship, t) >> ~ShipPropositions(p, ship, x, y, t)
+                        )
+
+    # Adjacency relationship
+    for x1 in range(grid_size):
+        for y1 in range(grid_size):
+            for x2 in range(grid_size):
+                for y2 in range(grid_size):
+                    if abs(x1 - x2) + abs(y1 - y2) == 1:  # Check Manhattan distance
+                        E.add_constraint(
+                            AdjProposition(x1, y1, x2, y2) << (abs(x1 - x2) + abs(y1 - y2) == 1)
+                        )
+                        E.add_constraint(
+                            AdjProposition(x1, y1, x2, y2) >> (abs(x1 - x2) + abs(y1 - y2) == 1)
+                        )
+    # Shot constraints
+    for p in players:
+        for t in turns:
+            for x in range(grid_size):
+                for y in range(grid_size):
+                    E.add_constraint(
+                        ShotProposition(p, x, y, t) >> 
+                        (HitProposition(p, x, y, t) ^ MissProposition(p, x, y, t))
+                    )
+                    E.add_constraint(
+                        HitProposition(p, x, y, t) >> 
+                        (ShotProposition(p, x, y, t) & ShipPropositions(3 - p, None, x, y, t))
+                    )
+                    E.add_constraint(
+                        MissProposition(p, x, y, t) >> 
+                        (ShotProposition(p, x, y, t) & ~ShipPropositions(3 - p, None, x, y, t))
+
+    # Bumping mechanism
+    for t in range(1, max(turns)):
+        for x1 in range(grid_size):
+            for y1 in range(grid_size):
+                for x2 in range(grid_size):
+                    for y2 in range(grid_size):
+                        if abs(x1 - x2) + abs(y1 - y2) == 1:  # Adjacent positions
+                            for p in players:
+                                for ship in ships:
+                                    E.add_constraint(
+                                        (BumpedProposition(p, ship, x1, y1, t) & 
+                                         ShipPropositions(p, ship, x1, y1, t - 1)) >>
+                                        (ShipPropositions(p, ship, x2, y2, t) & AdjProposition(x1, y1, x2, y2))
+                                    )
 
     # Enforce that turns are either Player 1's or Player 2's
     for t in turns:
@@ -154,22 +221,18 @@ def example_theory():
         E.add_constraint(
             TurnPropositions(2, t) >> TurnPropositions(1, t + 1)
         )
-    # Shot constraints
-    for i, j in grid_positions:
-        for t in range(max_turns):
-            E.add_constraint(shotY_ij(t) >> (hitY_ij(t) ^ missY_ij(t)))
-            E.add_constraint(hitY_ij(t) >> (shotY_ij(t) & shipY_xij(t)))
-            E.add_constraint(missY_ij(t) >> (shotY_ij(t) & ~shipY_xij(t)))
 
-    # Bumping mechanism
-    for t in range(1, max_turns):
-        for i, j, k, l in adj_pairs:  # Iterate over adjacent positions
-            E.add_constraint(bumpedY_xij(t) & shipY_xij(t-1) >> (shipY_xij(t) & adj(i, j, k, l)))
-
-    # Game end condition
-    for t in range(max_turns):
-        E.add_constraint(GameEndProposition(t) >> (~TurnPropositions(1, t) & ~TurnPropositions(2, t)))
-    return E
+    # Game end condition: The game ends when all ships of one player are sunk
+    for t in turns:
+        for p in players:
+            # If all ships of player `p` are sunk, the game ends at turn `t`
+            E.add_constraint(
+                (E.And(*[SunkProposition(p, ship, t) for ship in ships])) >> GameEndProposition(t)
+            )
+        # Ensure no turns are active after the game ends
+        E.add_constraint(
+            GameEndProposition(t) >> (~TurnPropositions(1, t) & ~TurnPropositions(2, t))
+        )
 
 if __name__ == "__main__":
 
