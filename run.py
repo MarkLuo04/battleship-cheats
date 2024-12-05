@@ -115,52 +115,49 @@ class TurnPropositions:
     def _prop_name(self):
         return f"Turn{self.player}_t{self.t}"
 
-
-# # Define the constraints
-grid_size = 5
-players = [1, 2]
-ships = ['A', 'B']
-turns = range(3)
-
-# Ship placement constraints
-for p in players:
-    for ship in ships:
+def example_theory():
+    # Define the constraints
+    grid_size = 5
+    players = [1, 2]
+    ships = ['A', 'B']
+    turns = range(3)
+    
+    # Ship placement constraints
+    for p in players:
+        for ship in ships:
+            for t in turns:
+                for x in range(grid_size):
+                    for y in range(grid_size):
+                        E.add_constraint(
+                            ShipPropositions(p, ship, x, y, t) >> ~BumpedProposition(p, ship, x, y, t)
+                        )
+    
+    # Adjacency constraints
+    for x in range(grid_size):
+        for y in range(grid_size):
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < grid_size and 0 <= ny < grid_size:
+                    E.add_constraint(AdjProposition(x, y, nx, ny))
+    
+    # Shot constraints
+    for p in players:
+        opponent = 3 - p
         for t in turns:
             for x in range(grid_size):
                 for y in range(grid_size):
-                    E.add_constraint(
-                        ShipPropositions(p, ship, x, y, t) >> ~BumpedProposition(p, ship, x, y, t)
-                    )
-
-# Adjacency constraints
-for x in range(grid_size):
-    for y in range(grid_size):
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            nx, ny = x + dx, y + dy
-            if 0 <= nx < grid_size and 0 <= ny < grid_size:
-                E.add_constraint(AdjProposition(x, y, nx, ny))
-
-# Shot constraints
-for p in players:
-    opponent = 3 - p
-    for t in turns:
-        for x in range(grid_size):
-            for y in range(grid_size):
-                shot = ShotProposition(p, x, y, t)
-                hit = HitProposition(opponent, x, y, t)
-                miss = MissProposition(opponent, x, y, t)
-                E.add_constraint(shot >> (hit | miss))
-                E.add_constraint(hit >> ShipPropositions(opponent, 'A', x, y, t))
-
-# Turn constraints
-for t in turns[:-1]:
-    for p in players:
-        opponent = 3 - p
-        E.add_constraint(TurnPropositions(p, t) >> TurnPropositions(opponent, t + 1))
-
-def example_theory():
+                    shot = ShotProposition(p, x, y, t)
+                    hit = HitProposition(opponent, x, y, t)
+                    miss = MissProposition(opponent, x, y, t)
+                    E.add_constraint(shot >> (hit | miss))
+                    E.add_constraint(hit >> ShipPropositions(opponent, 'A', x, y, t))
+    
+    # Turn constraints
+    for t in turns[:-1]:
+        for p in players:
+            opponent = 3 - p
+            E.add_constraint(TurnPropositions(p, t) >> TurnPropositions(opponent, t + 1))
     return E
-
 
 if __name__ == "__main__":
 
