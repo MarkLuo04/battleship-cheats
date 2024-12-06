@@ -1,20 +1,20 @@
-
 from bauhaus import Encoding, proposition, constraint
 from bauhaus.utils import count_solutions, likelihood
 
-# These two lines make sure a faster SAT solver is used.
+# Use a faster SAT solver
 from nnf import config
 config.sat_backend = "kissat"
 
-# Encoding that will store all of your constraints
+from functools import reduce
+import operator
+
+# Encoding that will store all your constraints
 E = Encoding()
 
-# Propositions are defined as per the provided structure
 @proposition(E)
 class BasicPropositions:
     def __init__(self, data):
         self.data = data
-
     def _prop_name(self):
         return f"A.{self.data}"
 
@@ -26,21 +26,21 @@ class ShipPropositions:
         self.x = x
         self.y = y
         self.t = t
-
     def _prop_name(self):
-        return f"ship{self.player}_{self.ship}{self.x}{self.y}({self.t})"
+        return f"ship{self.player}_{self.ship}_{self.x}_{self.y}({self.t})"
 
 @proposition(E)
 class BumpedProposition:
-    def __init__(self, player, ship, x, y, t):
+    def __init__(self, player, ship, x_from, y_from, x_to, y_to, t):
         self.player = player
         self.ship = ship
-        self.x = x
-        self.y = y
+        self.x_from = x_from
+        self.y_from = y_from
+        self.x_to = x_to
+        self.y_to = y_to
         self.t = t
-
     def _prop_name(self):
-        return f"bumped{self.player}_{self.ship}{self.x},{self.y}({self.t})"
+        return f"bumped{self.player}_{self.ship}_{self.x_from}_{self.y_from}_to_{self.x_to}_{self.y_to}({self.t})"
 
 @proposition(E)
 class ShipMovableProposition:
@@ -48,7 +48,6 @@ class ShipMovableProposition:
         self.player = player
         self.ship = ship
         self.t = t
-
     def _prop_name(self):
         return f"ship{self.player}_movable_{self.ship}({self.t})"
 
@@ -59,9 +58,8 @@ class AdjProposition:
         self.y1 = y1
         self.x2 = x2
         self.y2 = y2
-
     def _prop_name(self):
-        return f"adj_({self.x1}{self.y1}_{self.x2}{self.y2})"
+        return f"adj({self.x1},{self.y1},{self.x2},{self.y2})"
 
 @proposition(E)
 class ShotProposition:
@@ -70,7 +68,6 @@ class ShotProposition:
         self.x = x
         self.y = y
         self.t = t
-
     def _prop_name(self):
         return f"shot{self.player}_{self.x},{self.y}({self.t})"
 
@@ -81,7 +78,6 @@ class HitProposition:
         self.x = x
         self.y = y
         self.t = t
-
     def _prop_name(self):
         return f"hit{self.player}_{self.x},{self.y}({self.t})"
 
@@ -92,7 +88,6 @@ class MissProposition:
         self.x = x
         self.y = y
         self.t = t
-
     def _prop_name(self):
         return f"miss{self.player}_{self.x},{self.y}({self.t})"
 
@@ -102,7 +97,6 @@ class SunkProposition:
         self.player = player
         self.ship = ship
         self.t = t
-
     def _prop_name(self):
         return f"sunk{self.player}_{self.ship}({self.t})"
 
@@ -111,143 +105,158 @@ class TurnPropositions:
     def __init__(self, player, t):
         self.player = player
         self.t = t
-
     def _prop_name(self):
         return f"Turn{self.player}({self.t})"
 
-def example_theory():
-    grid_size = 5 # Example grid size
-    players = [1, 2] # Two players
-    ships = ['A', 'B', 'C']  # Example ship types
-    turns = range(5)  # Example: Max 5 turns
+@proposition(E)
+class GameEndProposition:
+    def __init__(self, t):
+        self.t = t
+    def _prop_name(self):
+        return f"GameEnd({self.t})"
 
-    # No two ships of the same player can occupy the same cell at the same time 
+def example_theory():
+    grid_size = 2
+    players = [1, 2]
+    # Two ships per player, each occupying one cell
+    ships = {'A': 1, 'B': 1}
+    turns = range(2)  # t=0 and t=1
+
+    # Initial placements at t=0:
+    # Player 1: Ship A at (0,0), Ship B at (0,1)
+    E.add_constraint(ShipPropositions(1, 'A', 0, 0, 0))
+    E.add_constraint(ShipPropositions(1, 'B', 0, 1, 0))
+    # Player 2: Ship A at (1,1), Ship B at (1,0)
+    E.add_constraint(ShipPropositions(2, 'A', 1, 1, 0))
+    E.add_constraint(ShipPropositions(2, 'B', 1, 0, 0))
+
+    # No-Overlap Constraints:
     for p in players:
         for t in turns:
-            for x1 in range(grid_size):
-                for y1 in range(grid_size):
-                    for ship1 in ships:
-                        for ship2 in ships:
-                            if ship1 != ship2:
-                                E.add_constraint(
-                                    ShipPropositions(p, ship1, x1, y1, t) >> ~ShipPropositions(p, ship2, x1, y1, t)
-                                )
-    # A ship can occupy multiple cells
-    for p in players:
-        for t in turns:
-            for ship, size in ships.items():
-                for x1 in range(grid_size):
-                    for y1 in range(grid_size):
-                        if y1 + size - 1 < grid_size:  # Ensure placement fits grid
-                            ship_positions = [
-                                ShipPropositions(p, ship, x1, y1 + offset, t)
-                                for offset in range(size)
-                            ]
+            for x in range(grid_size):
+                for y in range(grid_size):
+                    ships_list = list(ships.keys())
+                    for i in range(len(ships_list)):
+                        for j in range(i + 1, len(ships_list)):
+                            ship1 = ships_list[i]
+                            ship2 = ships_list[j]
                             E.add_constraint(
-                                E.And(*ship_positions)  # All cells occupied by this ship
+                                ShipPropositions(p, ship1, x, y, t) >> ~ShipPropositions(p, ship2, x, y, t)
                             )
 
-    # Sunk ships are removed
+    # Define adjacency in the 2x2 grid
+    adjacent_pairs = [((0,0),(0,1)), ((0,0),(1,0)), ((1,0),(1,1)), ((0,1),(1,1))]
+    for (x1,y1),(x2,y2) in adjacent_pairs:
+        E.add_constraint(AdjProposition(x1,y1,x2,y2))
+
+    # Turn setup: at t=0, Player 1 acts
+    E.add_constraint(TurnPropositions(1,0))
+    E.add_constraint(~TurnPropositions(2,0))
+
+    # Player 1 shoots at (1,1) at t=0
+    shot = ShotProposition(1,1,1,0)
+    E.add_constraint(shot)
+
+    # Make Player 2's ship 'A' movable at t=0
+    movable = ShipMovableProposition(2,'A',0)
+    E.add_constraint(movable)
+
+    # Define a bump action: If Player 2 bumps ship A from (1,1) to (1,0) at t=0
+    bump = BumpedProposition(2,'A',1,1,1,0,0)
+    from_pos = ShipPropositions(2,'A',1,1,0)
+    to_pos = ShipPropositions(2,'A',1,0,0)
+    adjacency = AdjProposition(1,1,1,0)
+
+    E.add_constraint(
+        (bump & from_pos & adjacency & movable) >> (to_pos & ~from_pos)
+    )
+
+    # Shot constraints (Hit or Miss):
+    hit = HitProposition(1,1,1,0)
+    miss = MissProposition(1,1,1,0)
+    E.add_constraint(shot >> ((hit & ~miss) | (~hit & miss)))
+
+    # Hit if final position of opponent's ship A is still at (1,1)
+    E.add_constraint(hit >> (shot & ShipPropositions(2,'A',1,1,0)))
+    # Miss if ship A is no longer at (1,1) after bumping
+    E.add_constraint(miss >> (shot & ~ShipPropositions(2,'A',1,1,0)))
+
+    # -----------------------
+    # Implementing Game End
+    # -----------------------
+
+    # If a ship is hit at time t, that ship is sunk at time t.
+    # Here, we know hit at (1,1) at t=0 sinks Player 2's Ship A at t=0
+    E.add_constraint(hit >> SunkProposition(2,'A',0))
+
+    # The game ends when all ships of one player are sunk.
     for p in players:
         for t in turns:
-            for x in range(grid_size):
-                for y in range(grid_size):
-                    for ship in ships:
-                        E.add_constraint(
-                            SunkProposition(p, ship, t) >> ~ShipPropositions(p, ship, x, y, t)
-                        )
+            # All ships of player p are sunk at time t:
+            # For player p, since ships = {'A': 1, 'B': 1}, we need both A and B sunk:
+            all_sunk = reduce(operator.and_, [SunkProposition(p, s, t) for s in ships])
+            E.add_constraint(all_sunk >> GameEndProposition(t))
 
-    # Adjacency relationship
-    for x1 in range(grid_size):
-        for y1 in range(grid_size):
-            for x2 in range(grid_size):
-                for y2 in range(grid_size):
-                    if abs(x1 - x2) + abs(y1 - y2) == 1:  # Check Manhattan distance
-                        E.add_constraint(
-                            AdjProposition(x1, y1, x2, y2) << (abs(x1 - x2) + abs(y1 - y2) == 1)
-                        )
-                        E.add_constraint(
-                            AdjProposition(x1, y1, x2, y2) >> (abs(x1 - x2) + abs(y1 - y2) == 1)
-                        )
-    # Shot constraints
-    for p in players:
-        for t in turns:
-            for x in range(grid_size):
-                for y in range(grid_size):
-                    E.add_constraint(
-                        ShotProposition(p, x, y, t) >> 
-                        (HitProposition(p, x, y, t) ^ MissProposition(p, x, y, t))
-                    )
-                    E.add_constraint(
-                        HitProposition(p, x, y, t) >> 
-                        (ShotProposition(p, x, y, t) & ShipPropositions(3 - p, None, x, y, t))
-                    )
-                    E.add_constraint(
-                        MissProposition(p, x, y, t) >> 
-                        (ShotProposition(p, x, y, t) & ~ShipPropositions(3 - p, None, x, y, t))
-
-    # Bumping mechanism
-    for t in range(1, max(turns)):
-        for x1 in range(grid_size):
-            for y1 in range(grid_size):
-                for x2 in range(grid_size):
-                    for y2 in range(grid_size):
-                        if abs(x1 - x2) + abs(y1 - y2) == 1:  # Adjacent positions
-                            for p in players:
-                                for ship in ships:
-                                    E.add_constraint(
-                                        (BumpedProposition(p, ship, x1, y1, t) & 
-                                         ShipPropositions(p, ship, x1, y1, t - 1)) >>
-                                        (ShipPropositions(p, ship, x2, y2, t) & AdjProposition(x1, y1, x2, y2))
-                                    )
-
-    # Enforce that turns are either Player 1's or Player 2's
+    # If the game ended at time t, no player can take a turn at time t
     for t in turns:
         E.add_constraint(
-            TurnPropositions(1, t) >> ~TurnPropositions(2, t)
+            GameEndProposition(t) >> ~TurnPropositions(1,t)
         )
         E.add_constraint(
-            TurnPropositions(2, t) >> ~TurnPropositions(1, t)
-        )
-        E.add_constraint(
-            TurnPropositions(1, t) | TurnPropositions(2, t)
+            GameEndProposition(t) >> ~TurnPropositions(2,t)
         )
 
-    # Alternating turns between players
-    for t in turns[:-1]:
-        E.add_constraint(
-            TurnPropositions(1, t) >> TurnPropositions(2, t + 1)
-        )
-        E.add_constraint(
-            TurnPropositions(2, t) >> TurnPropositions(1, t + 1)
-        )
-
-    # Game end condition: The game ends when all ships of one player are sunk
+    # Optionally, ensure that once the game ends, it remains ended at the next time step
     for t in turns:
-        for p in players:
-            # If all ships of player `p` are sunk, the game ends at turn `t`
+        next_t = t + 1
+        if next_t in turns:
             E.add_constraint(
-                (E.And(*[SunkProposition(p, ship, t) for ship in ships])) >> GameEndProposition(t)
+                GameEndProposition(t) >> GameEndProposition(next_t)
             )
-        # Ensure no turns are active after the game ends
-        E.add_constraint(
-            GameEndProposition(t) >> (~TurnPropositions(1, t) & ~TurnPropositions(2, t))
-        )
+
+    return E
 
 if __name__ == "__main__":
+    E = example_theory()
+    T = E.compile()
+    print("\nSatisfiable:", T.satisfiable())
+    sol_count = count_solutions(T)
+    print("# Solutions:", sol_count)
+    solution = T.solve()
+    print("   Solution:", solution)
 
-    T = example_theory()
-    # Don't compile until you're finished adding all your constraints!
-    T = T.compile()
-    # After compilation (and only after), you can check some of the properties
-    # of your model:
-    print("\nSatisfiable: %s" % T.satisfiable())
-    print("# Solutions: %d" % count_solutions(T))
-    print("   Solution: %s" % T.solve())
+    if sol_count > 0:
+        print("\nVariable likelihoods:")
+        # Define example propositions from the game
+        ship_p1_A_t0 = ShipPropositions(1, 'A', 0, 0, 0)    # Player 1's Ship A at (0,0) at t=0
+        ship_p1_B_t0 = ShipPropositions(1, 'B', 0, 1, 0)    # Player 1's Ship B at (0,1) at t=0
+        ship_p2_A_t0 = ShipPropositions(2, 'A', 1, 1, 0)    # Player 2's Ship A at (1,1) at t=0
+        ship_p2_B_t0 = ShipPropositions(2, 'B', 1, 0, 0)    # Player 2's Ship B at (1,0) at t=0
+        shot_p1_t0   = ShotProposition(1,1,1,0)           # Player 1 shoots at (1,1) at t=0
+        hit_p1_t0    = HitProposition(1,1,1,0)            # The shot by Player 1 at (1,1) at t=0 is a hit
+        miss_p1_t0   = MissProposition(1,1,1,0)           # The shot by Player 1 at (1,1) at t=0 is a miss
+        sunk_p2_A_t0 = SunkProposition(2, 'A', 0)         # Player 2's Ship A is sunk at t=0
+        game_end_t0  = GameEndProposition(0)              # The game ends at t=0
 
-    print("\nVariable likelihoods:")
-    for v,vn in zip([a,b,c,x,y,z], 'abcxyz'):
-        # Ensure that you only send these functions NNF formulas
-        # Literals are compiled to NNF here
-        print(" %s: %.2f" % (vn, likelihood(T, v)))
-    print()
+        # List of propositions to inspect
+        propositions_to_inspect = [
+            ship_p1_A_t0, ship_p1_B_t0,
+            ship_p2_A_t0, ship_p2_B_t0,
+            shot_p1_t0, hit_p1_t0, miss_p1_t0,
+            sunk_p2_A_t0, game_end_t0
+        ]
+
+        # Corresponding names for readability
+        proposition_names = [
+            'ship_p1_A_t0', 'ship_p1_B_t0',
+            'ship_p2_A_t0', 'ship_p2_B_t0',
+            'shot_p1_t0', 'hit_p1_t0', 'miss_p1_t0',
+            'sunk_p2_A_t0', 'game_end_t0'
+        ]
+
+        # Print their likelihoods
+        for prop, name in zip(propositions_to_inspect, proposition_names):
+            print(f" {name}: {likelihood(T, prop):.2f}")
+        print()
+    else:
+        print("No solutions found, skipping likelihood computation.")
