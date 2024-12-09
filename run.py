@@ -105,9 +105,9 @@ def generate_adjacent_pairs(grid_size):
     return adjacent
 
 def example_theory():
+    global players, ships, turns  # Declare as global to access outside the function
     grid_size = 5  # 5x5 grid
     players = [1, 2]
-    # Two ships per player, each occupying two adjacent cells (2x1)
     ships = ['A', 'B']
     turns = range(1, 5)  # Turns 1 to 4
 
@@ -279,11 +279,11 @@ def example_theory():
                 GameEndProposition(t) >> GameEndProposition(next_t)
             )
 
-    return E, players, ships, turns
+    T = E.compile()
+    return T  # Return only the compiled theory
 
 if __name__ == "__main__":
-    E, players, ships, turns = example_theory()
-    T = E.compile()
+    T = example_theory()  # Now, T is the compiled theory
     print("\nSatisfiable:", T.satisfiable())
     sol_count = count_solutions(T)
     print("# Solutions:", sol_count)
@@ -294,7 +294,7 @@ if __name__ == "__main__":
         
         print("\n=== Game End Likelihoods ===")
         # Iterate through all turns to check the likelihood of the game ending at each turn
-        for t in range(1, 5):  # Turns 1 to 4 (assuming t=0 is the initial setup)
+        for t in turns:  # Use the global 'turns' variable
             prop = GameEndProposition(t)
             likelihood_value = likelihood(T, prop)
             print(f"Game ends at Turn {t}: {likelihood_value:.2f}")
@@ -303,7 +303,7 @@ if __name__ == "__main__":
         # Define players and ships based on your model
         for p in players:
             for ship in ships:
-                for t in range(1, 5):
+                for t in turns:
                     prop = SunkProposition(p, ship, t)
                     likelihood_value = likelihood(T, prop)
                     print(f"Player {p} Ship {ship} sunk at Turn {t}: {likelihood_value:.2f}")
@@ -312,7 +312,7 @@ if __name__ == "__main__":
         # Define a subset of cells to inspect for hit/miss likelihoods
         # for simplicity, we'll inspect a few key cells
         key_cells = [(4, 4), (0, 0), (3, 4)]
-        for t in range(1, 5):
+        for t in turns:
             active_player = 1 if t % 2 == 1 else 2  # Assuming Player 1 starts at t=1
             for x, y in key_cells:
                 shot = ShotProposition(active_player, x, y, t)
